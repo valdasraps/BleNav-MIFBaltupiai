@@ -9,10 +9,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.os.Handler;
-import android.os.ParcelUuid;
 import android.util.Log;
-
-import com.google.android.gms.maps.model.Marker;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -21,15 +18,13 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-public class DeviceScanActivity extends ListActivity {
+public class BleManager extends ListActivity {
 
-    private final BluetoothAdapter bluetoothAdapter;
-    private final BLECallBack callBack;
+    private final BLECallBack callBack = new BLECallBack();
     private boolean mScanning;
     private final Handler handler = new Handler();
     private final Map<String, Anchor> anchors = new HashMap<>();
-    private final MapsActivity activity;
-    private final File savePath;
+    private final MainActivity activity;
     private File saveFile;
 
     private static final long SCAN_WINDOW_PERIOD = 3000;
@@ -38,38 +33,29 @@ public class DeviceScanActivity extends ListActivity {
         return anchors.size();
     }
 
-    public DeviceScanActivity(BluetoothAdapter bluetoothAdapter, MapsActivity activity, File savePath) {
-        this.bluetoothAdapter = bluetoothAdapter;
-        this.callBack = new BLECallBack();
+    public BleManager(MainActivity activity) {
         this.activity = activity;
-        this.savePath = savePath;
     }
 
     public void scanLeDevice(final boolean enable) {
         if (enable) {
 
-            if (!savePath.exists()) {
-                if (!savePath.mkdirs()) {
-                    android.util.Log.w("Warning!", "Cannot create directory: " + savePath.toString());
-                }
-            }
-
             String timeStamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
             String fileName = "a".concat(timeStamp.concat(".csv"));
-            String filePath = savePath + File.separator + fileName;
+            String filePath = activity.getSavePath() + File.separator + fileName;
 
             saveFile = new File(filePath);
             android.util.Log.i("Will be Saving!", saveFile.toString());
 
             mScanning = true;
-            bluetoothAdapter.startLeScan(callBack);
+            activity.getBluetoothAdapter().startLeScan(callBack);
 
             runSaver();
 
         } else {
 
             mScanning = false;
-            bluetoothAdapter.stopLeScan(callBack);
+            activity.getBluetoothAdapter().stopLeScan(callBack);
 
             anchors.clear();
 

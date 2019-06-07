@@ -7,9 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Environment;
-import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -27,47 +25,45 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.GroundOverlay;
 import com.google.android.gms.maps.model.GroundOverlayOptions;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
-
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
 
-public class MapsActivity extends AppCompatActivity
+public class MainActivity extends AppCompatActivity
         implements
         OnMapReadyCallback,
         ActivityCompat.OnRequestPermissionsResultCallback {
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private static final int REQUEST_ENABLE_BT = 1;
-    private static final LatLng MIFBALTUPIAI = new LatLng(54.72973774845973,25.26341289281845);
-    private static final int MARKER_REMOVE_PERIOD = 3000;
+    private static final LatLng MIF_BALTUPIAI = new LatLng(54.72973774845973,25.26341289281845);
 
     private GoogleMap mMap;
     private BitmapDescriptor mImage;
     private GroundOverlay mGroundOverlay;
     private File savePath;
-    private Handler markerRemoveHandler = new Handler();
     private CheckBox scanCheckbox;
     private TextView statusText;
 
     private BluetoothAdapter mBluetoothAdapter;
-    private DeviceScanActivity deviceScanActivity;
+    private BleManager bleManager;
+    private MarkerManager markerManager;
 
-    private final List<Marker> markers = new ArrayList<>();
+    public GoogleMap getMap() {
+        return mMap;
+    }
+
+    public File getSavePath() {
+        return savePath;
+    }
+
+    public BluetoothAdapter getBluetoothAdapter() {
+        return mBluetoothAdapter;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.button_maps);
+        setContentView(R.layout.main_map);
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
@@ -81,7 +77,6 @@ public class MapsActivity extends AppCompatActivity
         savePath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Loksys");
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
-            // Permission to access the location is missing.
             PermissionUtils.requestPermission(this, LOCATION_PERMISSION_REQUEST_CODE,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE, true);
         }
@@ -105,40 +100,19 @@ public class MapsActivity extends AppCompatActivity
 
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH)
                             != PackageManager.PERMISSION_GRANTED) {
-                        // Permission to access the location is missing.
+
                         PermissionUtils.requestPermission(this, LOCATION_PERMISSION_REQUEST_CODE,
                                 Manifest.permission.BLUETOOTH, true);
                     }
 
-                    //                // Is Bluetooth turned on?
-                    //                if (mBluetoothAdapter.isEnabled()) {
-                    //
-                    //                    // Are Bluetooth Advertisements supported on this device?
-                    //                    if (mBluetoothAdapter.isMultipleAdvertisementSupported()) {
-                    //
-                    //                        // Everything is supported and enabled, load the fragments.
-                    //                        setupFragments();
-                    //
-                    //                    } else {
-                    //
-                    //                        // Bluetooth Advertisements are not supported.
-                    //                        showErrorText(R.string.bt_ads_not_supported);
-                    //                    }
-                    //
-                    //                } else {
-                    //
-                    //                    // Prompt user to turn on Bluetooth (logic continues in onActivityResult()).
-                    //                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                    //                    startActivityForResult(enableBtIntent, Constants.REQUEST_ENABLE_BT);
-                    //                }
-
-                    this.deviceScanActivity = new DeviceScanActivity(this.mBluetoothAdapter, this, savePath);
-
+                    this.bleManager = new BleManager(this);
                     scanCheckbox.setEnabled(true);
 
                 }
             }
         }
+
+        this.markerManager = new MarkerManager(this);
 
         updateStatus();
 
@@ -152,33 +126,17 @@ public class MapsActivity extends AppCompatActivity
         mGroundOverlay = map.addGroundOverlay(new GroundOverlayOptions()
                 .image(mImage).anchor(0, 0)
                 .position(new LatLng(54.730021177604215,25.262626917658963), 82f, 40f));
-                //.bearing(30));
-
-        map.setOnMapClickListener(new GoogleMap.OnMapClickListener()
-        {
-            @Override
-            public void onMapClick(LatLng coord)
-            {
-                android.util.Log.i("Clicked!", coord.toString());
-                final Marker marker = mMap.addMarker(new MarkerOptions()
-                        .position(coord)
-                        .title("My Spot")
-                        .snippet("This is my spot!")
-                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
-                markers.add(marker);
-                markerRemoveHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        marker.remove();
-                    }
-                }, MARKER_REMOVE_PERIOD);
-                updateStatus();
-            }
-
-        });
 
         enableMyLocation();
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(MIFBALTUPIAI, 18));
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(MIF_BALTUPIAI, 18));
+
+        if (!savePath.exists()) {
+            if (!savePath.mkdirs()) {
+                android.util.Log.w("Warning!", "Cannot create directory: " + savePath.toString());
+            }
+        }
+
+        this.markerManager.initialize();
 
     }
 
@@ -195,56 +153,26 @@ public class MapsActivity extends AppCompatActivity
     }
 
     public void onClearMarkers(View view) {
-        for (Marker m: markers) {
-            m.remove();
-        }
-        markers.clear();
-        updateStatus();
+        this.markerManager.clear();
     }
 
     public void onScanToggled(View view) {
-        this.deviceScanActivity.scanLeDevice(scanCheckbox.isChecked());
+        this.bleManager.scanLeDevice(scanCheckbox.isChecked());
     }
 
     public void onSaveMarkers(View view) {
-
-        if (!savePath.exists()) {
-            if (!savePath.mkdirs()) {
-                android.util.Log.w("Warning!", "Cannot create directory: " + savePath.toString());
-            }
-        }
-
-        String timeStamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
-        String fileName = "m".concat(timeStamp.concat(".csv"));
-        String filePath = savePath + File.separator + fileName;
-
-        File f = new File(filePath);
-        android.util.Log.i("Saving!", f.toString());
-
-        String time = Long.toString(System.currentTimeMillis());
-
-        try {
-            FileWriter writer = new FileWriter(f);
-            for (Marker m: markers) {
-                writer.write(time);
-                writer.write(",");
-                writer.write(Double.toString(m.getPosition().latitude));
-                writer.write(",");
-                writer.write(Double.toString(m.getPosition().longitude));
-                writer.write("\n");
-            }
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        markers.clear();
-        updateStatus();
-
+        this.markerManager.save();
     }
 
     public void updateStatus() {
-        statusText.setText(String.format("Markers: %d, Anchors: %d", markers.size(), deviceScanActivity.getAnchorsCount()));
+        int anchors = -1, markers = -1;
+        if (this.bleManager != null) {
+            anchors = bleManager.getAnchorsCount();
+        }
+        if (this.markerManager != null) {
+            markers = markerManager.getSize();
+        }
+        statusText.setText(String.format("Markers: %d, Anchors: %d", markers, anchors));
     }
 
 }
