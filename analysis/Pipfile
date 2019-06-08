@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+sklearn = "*"
+gmaps = "*"
+matplotlib = "*"
+scikit-learn = "*"
+tensorflow = "*"
+tensorflow-gpu = "*"
+keras = "*"
+lib = "*"
+ble-nav = {path = "."}
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"
