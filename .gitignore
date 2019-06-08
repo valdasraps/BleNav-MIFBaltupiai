@@ -11,3 +11,4 @@ android/.gradle
 /android/build
 /android/captures
 /android/.externalNativeBuild
+.ipynb_checkpoints
