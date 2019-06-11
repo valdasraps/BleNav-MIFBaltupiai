@@ -165,14 +165,15 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void updateStatus() {
-        int anchors = -1, markers = -1;
+        long blinks = -1;
+        int markers = -1;
         if (this.bleManager != null) {
-            anchors = bleManager.getAnchorsCount();
+            blinks = bleManager.getBlinksCount();
         }
         if (this.markerManager != null) {
             markers = markerManager.getSize();
         }
-        statusText.setText(String.format("Markers: %d, Anchors: %d", markers, anchors));
+        statusText.setText(String.format("Markers: %d, Blinks: %d", markers, blinks));
     }
 
 }
