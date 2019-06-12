@@ -63,9 +63,10 @@ public class BleManager extends ListActivity {
         public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
             if (saver != null && device != null) {
                 String name = device.getName();
-                //if ("iBKS Plus".equals(name)) {
+                if ("iBKS Plus".equals(name)) {
                     queue.add(new Anchor(device.getAddress(), rssi));
-                //}
+                    blinks += 1;
+                }
             }
         }
 
