@@ -16,40 +16,41 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class MarkerManager {
+public class MarkerManager implements GoogleMap.OnMarkerClickListener {
 
     private static final int MARKER_REMOVE_PERIOD = 3000;
     private Handler markerRemoveHandler = new Handler();
 
     private final MainActivity activity;
-    private final ConcurrentMap<Marker, Long> markers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, Marker> markers = new ConcurrentHashMap<>();
 
     public MarkerManager(final MainActivity activity) {
         this.activity = activity;
     }
 
     public void initialize() {
-        activity.getMap().setOnMapClickListener(new GoogleMap.OnMapClickListener()
-        {
-            @Override
-            public void onMapClick(LatLng coord)
-            {
-                final Marker marker = activity.getMap().addMarker(new MarkerOptions()
-                        .position(coord)
-                        .title("My Spot")
-                        .snippet("This is my spot!")
-                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
-                markers.put(marker, System.currentTimeMillis());
-                markerRemoveHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        marker.remove();
-                    }
-                }, MARKER_REMOVE_PERIOD);
-                activity.updateStatus();
-            }
-
-        });
+        activity.getMap().setOnMarkerClickListener(this);
+//        activity.getMap().setOnMapClickListener(new GoogleMap.OnMapClickListener()
+//        {
+//            @Override
+//            public void onMapClick(LatLng coord)
+//            {
+//                final Marker marker = activity.getMap().addMarker(new MarkerOptions()
+//                        .position(coord)
+//                        .title("My Spot")
+//                        .snippet("This is my spot!")
+//                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+//                markers.put(marker, System.currentTimeMillis());
+//                markerRemoveHandler.postDelayed(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        marker.remove();
+//                    }
+//                }, MARKER_REMOVE_PERIOD);
+//                activity.updateStatus();
+//            }
+//
+//        });
     }
 
     public int getSize() {
@@ -57,9 +58,6 @@ public class MarkerManager {
     }
 
     public void clear() {
-        for (Marker m: markers.keySet()) {
-            m.remove();
-        }
         markers.clear();
         this.activity.updateStatus();
     }
@@ -75,12 +73,14 @@ public class MarkerManager {
 
         try {
             FileWriter writer = new FileWriter(f);
-            for (Map.Entry<Marker, Long> e: markers.entrySet()) {
-                writer.write(Long.toString(e.getValue()));
+            for (Map.Entry<Long, Marker> e: markers.entrySet()) {
+                writer.write(Long.toString(e.getKey()));
                 writer.write(",");
-                writer.write(Double.toString(e.getKey().getPosition().latitude));
+                writer.write(e.getValue().getTitle());
                 writer.write(",");
-                writer.write(Double.toString(e.getKey().getPosition().longitude));
+                writer.write(Double.toString(e.getValue().getPosition().latitude));
+                writer.write(",");
+                writer.write(Double.toString(e.getValue().getPosition().longitude));
                 writer.write("\n");
             }
             writer.close();
@@ -94,4 +94,10 @@ public class MarkerManager {
     }
 
 
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        markers.put(System.currentTimeMillis(), marker);
+        activity.updateStatus();
+        return false;
+    }
 }

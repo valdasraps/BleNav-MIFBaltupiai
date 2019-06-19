@@ -6,11 +6,13 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.TextView;
@@ -25,7 +27,18 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.GroundOverlay;
 import com.google.android.gms.maps.model.GroundOverlayOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.opencsv.CSVReader;
+
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity
         implements
@@ -116,16 +129,36 @@ public class MainActivity extends AppCompatActivity
 
         updateStatus();
 
+
+
     }
 
     @Override
     public void onMapReady(GoogleMap map) {
         mMap = map;
-        mImage = BitmapDescriptorFactory.fromResource(R.drawable.mif325_3a);
+        mImage = BitmapDescriptorFactory.fromResource(R.drawable.mif_3a_plotas);
 
         mGroundOverlay = map.addGroundOverlay(new GroundOverlayOptions()
-                .image(mImage).anchor(0, 0)
-                .position(new LatLng(54.730021177604215,25.262626917658963), 82f, 40f));
+                .image(mImage)
+                .positionFromBounds(new LatLngBounds(
+                        new LatLng(54.72973625, 25.26259929),
+                        new LatLng(54.73002198, 25.26375304))));
+
+        try {
+
+            InputStream input = this.getBaseContext().getResources().openRawResource(R.raw.graph);
+            CSVReader reader = new CSVReader(new InputStreamReader(input));
+
+            for (String[] line: reader.readAll()) {
+                map.addMarker(new MarkerOptions()
+                    .position(new LatLng(Double.valueOf(line[1]), Double.valueOf(line[2])))
+                    .title(line[0])
+                    .anchor(0.5f,0.5f)
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.black_point)));
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
 
         enableMyLocation();
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(MIF_BALTUPIAI, 18));
