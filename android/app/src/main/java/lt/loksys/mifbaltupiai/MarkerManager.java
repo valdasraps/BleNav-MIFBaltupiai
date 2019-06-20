@@ -7,14 +7,18 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.opencsv.CSVReader;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class MarkerManager implements GoogleMap.OnMarkerClickListener {
 
@@ -22,35 +26,30 @@ public class MarkerManager implements GoogleMap.OnMarkerClickListener {
     private Handler markerRemoveHandler = new Handler();
 
     private final MainActivity activity;
-    private final ConcurrentMap<Long, Marker> markers = new ConcurrentHashMap<>();
+    private final Map<Marker, Integer> graph = new HashMap<>();
+    private final ConcurrentLinkedDeque<MarkerClick> markers = new ConcurrentLinkedDeque<>();
 
     public MarkerManager(final MainActivity activity) {
-        this.activity = activity;
-    }
 
-    public void initialize() {
-        activity.getMap().setOnMarkerClickListener(this);
-//        activity.getMap().setOnMapClickListener(new GoogleMap.OnMapClickListener()
-//        {
-//            @Override
-//            public void onMapClick(LatLng coord)
-//            {
-//                final Marker marker = activity.getMap().addMarker(new MarkerOptions()
-//                        .position(coord)
-//                        .title("My Spot")
-//                        .snippet("This is my spot!")
-//                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
-//                markers.put(marker, System.currentTimeMillis());
-//                markerRemoveHandler.postDelayed(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        marker.remove();
-//                    }
-//                }, MARKER_REMOVE_PERIOD);
-//                activity.updateStatus();
-//            }
-//
-//        });
+        this.activity = activity;
+        this.activity.getMap().setOnMarkerClickListener(this);
+
+        try {
+
+            InputStream input = activity.getResources().openRawResource(R.raw.grafas);
+            CSVReader reader = new CSVReader(new InputStreamReader(input));
+
+            for (String[] line: reader.readAll()) {
+                final Marker marker = activity.getMap().addMarker(new MarkerOptions()
+                        .position(new LatLng(Double.valueOf(line[1]), Double.valueOf(line[2])))
+                        .anchor(0.5f, 0.5f)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.black_point)));
+                graph.put(marker, Integer.valueOf(line[0]));
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+
     }
 
     public int getSize() {
@@ -58,7 +57,7 @@ public class MarkerManager implements GoogleMap.OnMarkerClickListener {
     }
 
     public void clear() {
-        markers.clear();
+        markers.removeLast();
         this.activity.updateStatus();
     }
 
@@ -73,31 +72,54 @@ public class MarkerManager implements GoogleMap.OnMarkerClickListener {
 
         try {
             FileWriter writer = new FileWriter(f);
-            for (Map.Entry<Long, Marker> e: markers.entrySet()) {
-                writer.write(Long.toString(e.getKey()));
-                writer.write(",");
-                writer.write(e.getValue().getTitle());
-                writer.write(",");
-                writer.write(Double.toString(e.getValue().getPosition().latitude));
-                writer.write(",");
-                writer.write(Double.toString(e.getValue().getPosition().longitude));
-                writer.write("\n");
+            while (!markers.isEmpty()) {
+                MarkerClick click = markers.pop();
+                StringBuilder line = new StringBuilder();
+                line.append(click.time).append(",");
+                line.append(click.id).append(",");
+                line.append(click.pos.latitude).append(",");
+                line.append(click.pos.longitude).append("\n");
+                writer.write(line.toString());
             }
             writer.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        clear();
         activity.updateStatus();
 
     }
-
 
     @Override
     public boolean onMarkerClick(Marker marker) {
-        markers.put(System.currentTimeMillis(), marker);
+
+        final Marker current = activity.getMap().addMarker(new MarkerOptions()
+                .position(marker.getPosition())
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+
+        markerRemoveHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                current.remove();
+            }
+        }, MARKER_REMOVE_PERIOD);
+
+        markers.add(new MarkerClick(marker));
         activity.updateStatus();
         return false;
     }
+
+    private class MarkerClick {
+
+        LatLng pos;
+        Integer id;
+        Long time = System.currentTimeMillis();
+
+        MarkerClick(Marker marker) {
+            this.pos = marker.getPosition();
+            this.id = graph.get(marker);
+        }
+
+    }
+
 }
